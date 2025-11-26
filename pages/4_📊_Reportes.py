@@ -1,0 +1,487 @@
+"""
+Página de Reportes y Análisis
+"""
+
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from datetime import datetime, timedelta, date
+from utils.envios_db import buscar_envios, get_estadisticas_envios, get_sims_por_distribuidor
+from utils.distribuidores_db import buscar_distribuidores, get_todos_distribuidores
+from utils.supabase_client import get_supabase_client
+
+# Configuración de la página
+st.set_page_config(
+    page_title="Reportes - BAITEL",
+    page_icon="📊",
+    layout="wide"
+)
+
+# CSS personalizado
+st.markdown("""
+<style>
+    .metric-card {
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+        text-align: center;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Header
+st.title("📊 Reportes y Análisis")
+st.markdown("---")
+
+# Tabs para diferentes reportes
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📈 Dashboard General",
+    "🔍 Consulta Personalizada",
+    "👥 Por Distribuidor",
+    "📅 Análisis Temporal"
+])
+
+# TAB 1: DASHBOARD GENERAL
+with tab1:
+    st.subheader("Dashboard General de Operaciones")
+    
+    # Obtener estadísticas
+    with st.spinner("Cargando estadísticas..."):
+        stats_envios = get_estadisticas_envios()
+        
+        # Obtener datos de distribuidores
+        supabase = get_supabase_client()
+        dist_activos = supabase.table('distribuidores').select('*', count='exact').eq('estatus', 'ACTIVO').execute()
+        
+        # Actividad últimos 30 días
+        hace_30_dias = (datetime.now() - timedelta(days=30)).date().isoformat()
+        envios_30d = supabase.table('envios')\
+            .select('*', count='exact')\
+            .gte('fecha', hace_30_dias)\
+            .eq('estatus', 'ACTIVO')\
+            .execute()
+    
+    # Métricas principales
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("📱 Total SIMs Registradas", f"{stats_envios['total']:,}")
+    
+    with col2:
+        st.metric("✅ SIMs Activas", f"{stats_envios['activos']:,}")
+    
+    with col3:
+        st.metric("👥 Distribuidores Activos", f"{dist_activos.count:,}")
+    
+    with col4:
+        st.metric("📥 Asignaciones (30 días)", f"{envios_30d.count:,}")
+    
+    st.markdown("---")
+    
+    # Gráficas
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📊 Distribución de SIMs por Estatus")
+        
+        fig_estatus = go.Figure(data=[go.Pie(
+            labels=['Activas', 'Reasignadas', 'Canceladas'],
+            values=[
+                stats_envios['activos'],
+                stats_envios['reasignados'],
+                stats_envios['cancelados']
+            ],
+            hole=.4,
+            marker=dict(colors=['#28a745', '#ffc107', '#dc3545'])
+        )])
+        
+        fig_estatus.update_layout(height=350, margin=dict(l=20, r=20, t=30, b=20))
+        st.plotly_chart(fig_estatus, use_container_width=True)
+    
+    with col2:
+        st.subheader("🏆 Top 10 Distribuidores")
+        
+        # Obtener top distribuidores
+        top_dist = supabase.table('envios')\
+            .select('codigo_bt, nombre_distribuidor')\
+            .eq('estatus', 'ACTIVO')\
+            .execute()
+        
+        if top_dist.data:
+            df_top = pd.DataFrame(top_dist.data)
+            top_10 = df_top.groupby(['codigo_bt', 'nombre_distribuidor']).size()\
+                .reset_index(name='total')\
+                .sort_values('total', ascending=False)\
+                .head(10)
+            
+            fig_top = px.bar(
+                top_10,
+                x='total',
+                y='codigo_bt',
+                orientation='h',
+                text='total',
+                color='total',
+                color_continuous_scale='Blues'
+            )
+            
+            fig_top.update_layout(
+                height=350,
+                showlegend=False,
+                xaxis_title="SIMs Asignadas",
+                yaxis_title="",
+                yaxis={'categoryorder': 'total ascending'},
+                margin=dict(l=20, r=20, t=30, b=20)
+            )
+            
+            fig_top.update_traces(textposition='outside')
+            st.plotly_chart(fig_top, use_container_width=True)
+        else:
+            st.info("Sin datos de envíos")
+    
+    st.markdown("---")
+    
+    # Actividad por día (últimos 30 días)
+    st.subheader("📈 Actividad Diaria (Últimos 30 Días)")
+    
+    envios_recientes = supabase.table('envios')\
+        .select('fecha, iccid')\
+        .gte('fecha', hace_30_dias)\
+        .eq('estatus', 'ACTIVO')\
+        .execute()
+    
+    if envios_recientes.data:
+        df_actividad = pd.DataFrame(envios_recientes.data)
+        df_actividad['fecha'] = pd.to_datetime(df_actividad['fecha'])
+        actividad_diaria = df_actividad.groupby('fecha').size().reset_index(name='cantidad')
+        
+        fig_linea = px.line(
+            actividad_diaria,
+            x='fecha',
+            y='cantidad',
+            labels={'fecha': 'Fecha', 'cantidad': 'SIMs Asignadas'},
+            markers=True
+        )
+        
+        fig_linea.update_layout(
+            height=300,
+            hovermode='x unified',
+            margin=dict(l=20, r=20, t=30, b=20)
+        )
+        
+        st.plotly_chart(fig_linea, use_container_width=True)
+    else:
+        st.info("Sin actividad en los últimos 30 días")
+
+# TAB 2: CONSULTA PERSONALIZADA
+with tab2:
+    st.subheader("Consulta Personalizada de Envíos")
+    
+    # Filtros
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        iccid_buscar = st.text_input(
+            "ICCID (parcial)",
+            placeholder="895214006370...",
+            help="Buscar por ICCID completo o parcial"
+        )
+    
+    with col2:
+        codigo_bt_buscar = st.text_input(
+            "Código BT",
+            placeholder="BT032-SAYULA",
+            help="Buscar por código de distribuidor"
+        )
+    
+    with col3:
+        estatus_buscar = st.selectbox(
+            "Estatus",
+            ["TODOS", "ACTIVO", "REASIGNADO", "CANCELADO"]
+        )
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        fecha_desde = st.date_input(
+            "Fecha desde",
+            value=date.today() - timedelta(days=30),
+            help="Fecha inicial del rango"
+        )
+    
+    with col2:
+        fecha_hasta = st.date_input(
+            "Fecha hasta",
+            value=date.today(),
+            help="Fecha final del rango"
+        )
+    
+    with col3:
+        limite_resultados = st.number_input(
+            "Límite de resultados",
+            min_value=10,
+            max_value=1000,
+            value=100,
+            step=10
+        )
+    
+    if st.button("🔍 Buscar Envíos", type="primary"):
+        with st.spinner("Buscando..."):
+            resultados = buscar_envios(
+                iccid=iccid_buscar if iccid_buscar else None,
+                codigo_bt=codigo_bt_buscar if codigo_bt_buscar else None,
+                fecha_desde=fecha_desde,
+                fecha_hasta=fecha_hasta,
+                estatus=estatus_buscar if estatus_buscar != "TODOS" else None,
+                limit=limite_resultados
+            )
+        
+        if resultados:
+            st.success(f"✅ {len(resultados)} envío(s) encontrado(s)")
+            
+            # Mostrar tabla
+            df = pd.DataFrame(resultados)
+            df_display = df[['fecha', 'iccid', 'codigo_bt', 'nombre_distribuidor', 'estatus', 'observaciones']].copy()
+            df_display.columns = ['Fecha', 'ICCID', 'Código BT', 'Distribuidor', 'Estatus', 'Observaciones']
+            
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            
+            # Exportar
+            csv = df_display.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Descargar CSV",
+                data=csv,
+                file_name=f"envios_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        else:
+            st.warning("⚠️ No se encontraron envíos con esos criterios")
+
+# TAB 3: POR DISTRIBUIDOR
+with tab3:
+    st.subheader("Consulta por Distribuidor")
+    
+    # Buscar distribuidor
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        query_dist = st.text_input(
+            "Buscar distribuidor",
+            placeholder="Código, nombre o plaza",
+            key="query_dist_reporte"
+        )
+    
+    with col2:
+        filtro_dist = st.selectbox(
+            "Estatus",
+            ["ACTIVO", "TODOS", "BAJA", "SUSPENDIDO"],
+            key="filtro_dist_reporte"
+        )
+    
+    if query_dist:
+        estatus_filtro = None if filtro_dist == "TODOS" else filtro_dist
+        distribuidores = buscar_distribuidores(query=query_dist, estatus=estatus_filtro, limit=20)
+        
+        if distribuidores:
+            df_dist = pd.DataFrame(distribuidores)
+            
+            # Seleccionar distribuidor
+            codigo_seleccionado = st.selectbox(
+                "Seleccionar distribuidor",
+                df_dist['codigo_bt'].tolist(),
+                format_func=lambda x: f"{x} - {df_dist[df_dist['codigo_bt']==x]['nombre'].values[0]}"
+            )
+            
+            dist_info = df_dist[df_dist['codigo_bt'] == codigo_seleccionado].iloc[0]
+            
+            # Mostrar información del distribuidor
+            st.markdown("---")
+            st.markdown("### 📋 Información del Distribuidor")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Código BT", dist_info['codigo_bt'])
+            with col2:
+                st.metric("Nombre", dist_info['nombre'])
+            with col3:
+                st.metric("Plaza", dist_info['plaza'])
+            with col4:
+                st.metric("Estatus", dist_info['estatus'])
+            
+            # Obtener SIMs del distribuidor
+            st.markdown("---")
+            st.markdown("### 📱 SIMs Asignadas")
+            
+            sims_activas = get_sims_por_distribuidor(codigo_seleccionado, estatus='ACTIVO')
+            sims_todas = get_sims_por_distribuidor(codigo_seleccionado, estatus='ACTIVO')
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.metric("SIMs Activas", len(sims_activas))
+            
+            with col2:
+                # Calcular promedio mensual
+                if sims_activas:
+                    df_sims = pd.DataFrame(sims_activas)
+                    df_sims['fecha'] = pd.to_datetime(df_sims['fecha'])
+                    meses_activo = (datetime.now() - df_sims['fecha'].min()).days / 30
+                    promedio_mes = len(sims_activas) / max(meses_activo, 1)
+                    st.metric("Promedio Mensual", f"{promedio_mes:.1f}")
+            
+            # Mostrar tabla de SIMs
+            if sims_activas:
+                df_sims_display = pd.DataFrame(sims_activas)
+                df_sims_display = df_sims_display[['fecha', 'iccid', 'observaciones']].copy()
+                df_sims_display.columns = ['Fecha', 'ICCID', 'Observaciones']
+                
+                st.dataframe(df_sims_display, use_container_width=True, hide_index=True)
+                
+                # Exportar
+                csv = df_sims_display.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label=f"📥 Descargar SIMs de {codigo_seleccionado}",
+                    data=csv,
+                    file_name=f"sims_{codigo_seleccionado}_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("Este distribuidor no tiene SIMs activas asignadas")
+        else:
+            st.warning("⚠️ No se encontraron distribuidores")
+
+# TAB 4: ANÁLISIS TEMPORAL
+with tab4:
+    st.subheader("Análisis Temporal de Asignaciones")
+    
+    # Selector de período
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        periodo = st.selectbox(
+            "Período de análisis",
+            ["Últimos 7 días", "Últimos 30 días", "Últimos 90 días", "Último año", "Personalizado"]
+        )
+    
+    with col2:
+        if periodo == "Personalizado":
+            fecha_inicio = st.date_input(
+                "Fecha inicio",
+                value=date.today() - timedelta(days=30)
+            )
+            fecha_fin = st.date_input(
+                "Fecha fin",
+                value=date.today()
+            )
+        else:
+            dias = {"Últimos 7 días": 7, "Últimos 30 días": 30, "Últimos 90 días": 90, "Último año": 365}[periodo]
+            fecha_inicio = date.today() - timedelta(days=dias)
+            fecha_fin = date.today()
+    
+    if st.button("📊 Generar Análisis", type="primary"):
+        with st.spinner("Generando análisis..."):
+            supabase = get_supabase_client()
+            
+            # Obtener datos del período
+            envios_periodo = supabase.table('envios')\
+                .select('fecha, codigo_bt, iccid, estatus')\
+                .gte('fecha', fecha_inicio.isoformat())\
+                .lte('fecha', fecha_fin.isoformat())\
+                .execute()
+            
+            if envios_periodo.data:
+                df = pd.DataFrame(envios_periodo.data)
+                df['fecha'] = pd.to_datetime(df['fecha'])
+                
+                # Métricas del período
+                st.markdown("### 📊 Resumen del Período")
+                
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Total Asignaciones", len(df))
+                
+                with col2:
+                    activas = len(df[df['estatus'] == 'ACTIVO'])
+                    st.metric("Activas", activas)
+                
+                with col3:
+                    distribuidores_unicos = df['codigo_bt'].nunique()
+                    st.metric("Distribuidores", distribuidores_unicos)
+                
+                with col4:
+                    promedio_dia = len(df) / max((fecha_fin - fecha_inicio).days, 1)
+                    st.metric("Promedio/Día", f"{promedio_dia:.1f}")
+                
+                st.markdown("---")
+                
+                # Gráfica de tendencia
+                st.markdown("### 📈 Tendencia de Asignaciones")
+                
+                df_diario = df.groupby('fecha').size().reset_index(name='cantidad')
+                
+                fig = px.area(
+                    df_diario,
+                    x='fecha',
+                    y='cantidad',
+                    labels={'fecha': 'Fecha', 'cantidad': 'Asignaciones'},
+                    color_discrete_sequence=['#1f77b4']
+                )
+                
+                fig.update_layout(height=400, hovermode='x unified')
+                st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("---")
+                
+                # Top distribuidores del período
+                st.markdown("### 🏆 Top Distribuidores del Período")
+                
+                top_periodo = df.groupby('codigo_bt').size()\
+                    .reset_index(name='asignaciones')\
+                    .sort_values('asignaciones', ascending=False)\
+                    .head(15)
+                
+                fig_top = px.bar(
+                    top_periodo,
+                    x='asignaciones',
+                    y='codigo_bt',
+                    orientation='h',
+                    text='asignaciones',
+                    color='asignaciones',
+                    color_continuous_scale='Viridis'
+                )
+                
+                fig_top.update_layout(
+                    height=500,
+                    showlegend=False,
+                    xaxis_title="Asignaciones",
+                    yaxis_title="",
+                    yaxis={'categoryorder': 'total ascending'}
+                )
+                
+                fig_top.update_traces(textposition='outside')
+                st.plotly_chart(fig_top, use_container_width=True)
+                
+                # Exportar análisis
+                st.markdown("---")
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Descargar Datos Completos",
+                    data=csv,
+                    file_name=f"analisis_{fecha_inicio}_{fecha_fin}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            else:
+                st.warning("⚠️ No hay datos en el período seleccionado")
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: #666; padding: 1rem;'>
+    <small>💡 Tip: Exporta los reportes a CSV para análisis más profundos en Excel</small>
+</div>
+""", unsafe_allow_html=True)
