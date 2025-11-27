@@ -14,21 +14,24 @@ load_dotenv()
 def get_supabase_client() -> Client:
     """
     Obtener cliente de Supabase con cache
-    Prioriza secrets de Streamlit Cloud, luego variables de entorno
+    Prioriza variables de entorno (Railway), luego secrets de Streamlit
     
     Returns:
         Client: Cliente de Supabase
     """
-    # Intentar obtener de Streamlit secrets primero (producción)
-    try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
-    except (KeyError, FileNotFoundError):
-        # Fallback a variables de entorno (desarrollo local)
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
+    # Intentar obtener de variables de entorno primero (Railway, desarrollo local)
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_KEY")
+    
+    # Si no están en variables de entorno, intentar secrets de Streamlit
+    if not url or not key:
+        try:
+            url = st.secrets["SUPABASE_URL"]
+            key = st.secrets["SUPABASE_KEY"]
+        except (KeyError, FileNotFoundError, AttributeError):
+            pass
     
     if not url or not key:
-        raise ValueError("SUPABASE_URL y SUPABASE_KEY deben estar configurados en secrets o .env")
+        raise ValueError("SUPABASE_URL y SUPABASE_KEY deben estar configurados en variables de entorno o secrets")
     
     return create_client(url, key)
