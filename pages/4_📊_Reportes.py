@@ -59,7 +59,7 @@ with tab1:
         hace_30_dias = (datetime.now() - timedelta(days=30)).date().isoformat()
         envios_30d = supabase.table('envios')\
             .select('*', count='exact')\
-            .gte('fecha', hace_30_dias)\
+            .gte('fecha_envio', hace_30_dias)\
             .eq('estatus', 'ACTIVO')\
             .execute()
     
@@ -147,20 +147,20 @@ with tab1:
     
     envios_recientes = supabase.table('envios')\
         .select('fecha, iccid')\
-        .gte('fecha', hace_30_dias)\
+        .gte('fecha_envio', hace_30_dias)\
         .eq('estatus', 'ACTIVO')\
         .execute()
     
     if envios_recientes.data:
         df_actividad = pd.DataFrame(envios_recientes.data)
-        df_actividad['fecha'] = pd.to_datetime(df_actividad['fecha'])
-        actividad_diaria = df_actividad.groupby('fecha').size().reset_index(name='cantidad')
+        df_actividad['fecha_envio'] = pd.to_datetime(df_actividad['fecha_envio'])
+        actividad_diaria = df_actividad.groupby('fecha_envio').size().reset_index(name='cantidad')
         
         fig_linea = px.line(
             actividad_diaria,
-            x='fecha',
+            x='fecha_envio',
             y='cantidad',
-            labels={'fecha': 'Fecha', 'cantidad': 'SIMs Asignadas'},
+            labels={'fecha_envio': 'Fecha', 'cantidad': 'SIMs Asignadas'},
             markers=True
         )
         
@@ -242,7 +242,7 @@ with tab2:
             
             # Mostrar tabla
             df = pd.DataFrame(resultados)
-            df_display = df[['fecha', 'iccid', 'codigo_bt', 'nombre_distribuidor', 'estatus', 'observaciones']].copy()
+            df_display = df[['fecha_envio', 'iccid', 'codigo_bt', 'nombre_distribuidor', 'estatus', 'observaciones']].copy()
             df_display.columns = ['Fecha', 'ICCID', 'Código BT', 'Distribuidor', 'Estatus', 'Observaciones']
             
             st.dataframe(df_display, use_container_width=True, hide_index=True)
@@ -327,15 +327,15 @@ with tab3:
                 # Calcular promedio mensual
                 if sims_activas:
                     df_sims = pd.DataFrame(sims_activas)
-                    df_sims['fecha'] = pd.to_datetime(df_sims['fecha'])
-                    meses_activo = (datetime.now() - df_sims['fecha'].min()).days / 30
+                    df_sims['fecha_envio'] = pd.to_datetime(df_sims['fecha_envio'])
+                    meses_activo = (datetime.now() - df_sims['fecha_envio'].min()).days / 30
                     promedio_mes = len(sims_activas) / max(meses_activo, 1)
                     st.metric("Promedio Mensual", f"{promedio_mes:.1f}")
             
             # Mostrar tabla de SIMs
             if sims_activas:
                 df_sims_display = pd.DataFrame(sims_activas)
-                df_sims_display = df_sims_display[['fecha', 'iccid', 'observaciones']].copy()
+                df_sims_display = df_sims_display[['fecha_envio', 'iccid', 'observaciones']].copy()
                 df_sims_display.columns = ['Fecha', 'ICCID', 'Observaciones']
                 
                 st.dataframe(df_sims_display, use_container_width=True, hide_index=True)
@@ -388,13 +388,13 @@ with tab4:
             # Obtener datos del período
             envios_periodo = supabase.table('envios')\
                 .select('fecha, codigo_bt, iccid, estatus')\
-                .gte('fecha', fecha_inicio.isoformat())\
-                .lte('fecha', fecha_fin.isoformat())\
+                .gte('fecha_envio', fecha_inicio.isoformat())\
+                .lte('fecha_envio', fecha_fin.isoformat())\
                 .execute()
             
             if envios_periodo.data:
                 df = pd.DataFrame(envios_periodo.data)
-                df['fecha'] = pd.to_datetime(df['fecha'])
+                df['fecha_envio'] = pd.to_datetime(df['fecha_envio'])
                 
                 # Métricas del período
                 st.markdown("### 📊 Resumen del Período")
@@ -421,13 +421,13 @@ with tab4:
                 # Gráfica de tendencia
                 st.markdown("### 📈 Tendencia de Asignaciones")
                 
-                df_diario = df.groupby('fecha').size().reset_index(name='cantidad')
+                df_diario = df.groupby('fecha_envio').size().reset_index(name='cantidad')
                 
                 fig = px.area(
                     df_diario,
-                    x='fecha',
+                    x='fecha_envio',
                     y='cantidad',
-                    labels={'fecha': 'Fecha', 'cantidad': 'Asignaciones'},
+                    labels={'fecha_envio': 'Fecha', 'cantidad': 'Asignaciones'},
                     color_discrete_sequence=['#1f77b4']
                 )
                 

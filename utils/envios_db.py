@@ -121,10 +121,10 @@ def buscar_envios(
         query = query.eq('codigo_bt', codigo_bt.upper().strip())
     
     if fecha_desde:
-        query = query.gte('fecha', fecha_desde.isoformat())
+        query = query.gte('fecha_envio', fecha_desde.isoformat())
     
     if fecha_hasta:
-        query = query.lte('fecha', fecha_hasta.isoformat())
+        query = query.lte('fecha_envio', fecha_hasta.isoformat())
     
     if estatus:
         query = query.eq('estatus', estatus.upper().strip())
