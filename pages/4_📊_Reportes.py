@@ -146,7 +146,7 @@ with tab1:
     st.subheader("📈 Actividad Diaria (Últimos 30 Días)")
     
     envios_recientes = supabase.table('envios')\
-        .select('fecha, iccid')\
+        .select('fecha_envio, iccid')\
         .gte('fecha_envio', hace_30_dias)\
         .eq('estatus', 'ACTIVO')\
         .execute()
@@ -387,7 +387,7 @@ with tab4:
             
             # Obtener datos del período
             envios_periodo = supabase.table('envios')\
-                .select('fecha, codigo_bt, iccid, estatus')\
+                .select('fecha_envio, codigo_bt, iccid, estatus')\
                 .gte('fecha_envio', fecha_inicio.isoformat())\
                 .lte('fecha_envio', fecha_fin.isoformat())\
                 .execute()
