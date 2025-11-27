@@ -91,8 +91,8 @@ def get_dashboard_data():
         # Actividad últimos 30 días
         hace_30_dias = (datetime.now() - timedelta(days=30)).date().isoformat()
         actividad_reciente = supabase.table('envios')\
-            .select('fecha, codigo_bt, iccid')\
-            .gte('fecha', hace_30_dias)\
+            .select('fecha_envio, codigo_bt, iccid')\
+            .gte('fecha_envio', hace_30_dias)\
             .eq('estatus', 'ACTIVO')\
             .execute()
         
@@ -144,7 +144,7 @@ if data:
     
     with col4:
         actividad_hoy = len([x for x in data['actividad_reciente'] 
-                            if x['fecha'] == datetime.now().date().isoformat()])
+                            if x.get('fecha_envio', '').startswith(datetime.now().date().isoformat())])
         st.metric(
             label="📥 Asignaciones Hoy",
             value=actividad_hoy,
@@ -185,8 +185,9 @@ if data:
         if data['actividad_reciente']:
             # Agrupar por fecha
             df_actividad = pd.DataFrame(data['actividad_reciente'])
-            df_actividad['fecha'] = pd.to_datetime(df_actividad['fecha'])
-            actividad_por_dia = df_actividad.groupby('fecha').size().reset_index(name='cantidad')
+            df_actividad['fecha_envio'] = pd.to_datetime(df_actividad['fecha_envio'])
+            actividad_por_dia = df_actividad.groupby('fecha_envio').size().reset_index(name='cantidad')
+            actividad_por_dia.rename(columns={'fecha_envio': 'fecha'}, inplace=True)
             
             fig_actividad = px.line(
                 actividad_por_dia,
