@@ -255,3 +255,23 @@ def get_todos_distribuidores() -> List[Dict]:
         .execute()
     
     return result.data
+
+
+def eliminar_distribuidor(id: str) -> Dict:
+    """
+    Eliminar un distribuidor por su ID
+    
+    Args:
+        id: UUID del distribuidor
+    
+    Returns:
+        Distribuidor eliminado
+    """
+    supabase = get_supabase_client()
+    
+    result = supabase.table('distribuidores')\
+        .delete()\
+        .eq('id', id)\
+        .execute()
+    
+    return result.data[0] if result.data else None

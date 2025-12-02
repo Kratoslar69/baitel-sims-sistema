@@ -4,6 +4,7 @@ Página de Administración de Distribuidores
 
 import streamlit as st
 import pandas as pd
+import time
 from utils.distribuidores_db import (
     buscar_distribuidores,
     crear_distribuidor,
@@ -242,7 +243,13 @@ with tab2:
                         help="Estado del distribuidor"
                     )
                 
-                submitted_edit = st.form_submit_button("💾 Guardar Cambios", type="primary", use_container_width=True)
+                col_btn1, col_btn2 = st.columns([3, 1])
+                
+                with col_btn1:
+                    submitted_edit = st.form_submit_button("💾 Guardar Cambios", type="primary", use_container_width=True)
+                
+                with col_btn2:
+                    submitted_delete = st.form_submit_button("🗑️ Eliminar", type="secondary", use_container_width=True)
                 
                 if submitted_edit:
                     try:
@@ -257,11 +264,34 @@ with tab2:
                                 estatus=nuevo_estatus
                             )
                         
-                        st.success(f"✅ Distribuidor {codigo_editar} actualizado exitosamente")
+                        st.toast(f"✅ Distribuidor {nuevo_codigo_bt} actualizado exitosamente", icon="✅")
+                        time.sleep(1.5)
                         st.rerun()
                         
                     except Exception as e:
                         st.error(f"❌ Error al actualizar: {str(e)}")
+                
+                if submitted_delete:
+                    st.warning("⚠️ ¿Estás seguro de eliminar este distribuidor?")
+                    st.info(f"📋 {dist_actual['codigo_bt']} - {dist_actual['nombre']}")
+                    
+                    col_confirm1, col_confirm2 = st.columns(2)
+                    
+                    if col_confirm1.button("✅ Sí, eliminar", type="primary", use_container_width=True):
+                        try:
+                            from utils.distribuidores_db import eliminar_distribuidor
+                            with st.spinner("Eliminando distribuidor..."):
+                                eliminar_distribuidor(dist_actual['id'])
+                            
+                            st.toast(f"🗑️ Distribuidor {dist_actual['codigo_bt']} eliminado exitosamente", icon="🗑️")
+                            time.sleep(1.5)
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"❌ Error al eliminar: {str(e)}")
+                    
+                    if col_confirm2.button("❌ Cancelar", use_container_width=True):
+                        st.rerun()
         else:
             st.warning("⚠️ No se encontraron distribuidores")
     else:
