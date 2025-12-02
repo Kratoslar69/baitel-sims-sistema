@@ -372,7 +372,7 @@ with tab4:
         with st.spinner("Cargando datos..."):
             supabase = get_supabase_client()
             todos_envios = supabase.table('envios')\
-                .select('fecha_envio, iccid')\
+                .select('fecha_envio, iccid, codigo_bt, nombre_distribuidor')\
                 .execute()
         
         if todos_envios.data:
@@ -382,11 +382,12 @@ with tab4:
             df_all['mes'] = df_all['fecha_envio'].dt.month
             df_all['mes_nombre'] = df_all['fecha_envio'].dt.strftime('%B')
             
-            # Obtener años disponibles
+            # Obtener años y distribuidores disponibles
             años_disponibles = sorted(df_all['año'].unique(), reverse=True)
+            distribuidores_disponibles = sorted(df_all['codigo_bt'].unique())
             
-            # Selector de año
-            col1, col2 = st.columns([1, 3])
+            # Selectores
+            col1, col2, col3 = st.columns([1, 2, 1])
             with col1:
                 año_seleccionado = st.selectbox(
                     "Seleccionar año",
@@ -394,11 +395,25 @@ with tab4:
                     key="año_selector"
                 )
             
+            with col2:
+                distribuidor_seleccionado = st.selectbox(
+                    "Seleccionar distribuidor",
+                    ["TODOS"] + distribuidores_disponibles,
+                    key="distribuidor_selector"
+                )
+            
             # Filtrar por año
-            df_año = df_all[df_all['año'] == año_seleccionado].copy()
+            df_filtrado = df_all[df_all['año'] == año_seleccionado].copy()
+            
+            # Filtrar por distribuidor si no es TODOS
+            if distribuidor_seleccionado != "TODOS":
+                df_filtrado = df_filtrado[df_filtrado['codigo_bt'] == distribuidor_seleccionado].copy()
+                titulo_grafica = f'SIMs Surtidos a {distribuidor_seleccionado} por Mes - {año_seleccionado}'
+            else:
+                titulo_grafica = f'SIMs Surtidos (Todos los Distribuidores) por Mes - {año_seleccionado}'
             
             # Agrupar por mes
-            df_mensual = df_año.groupby(['mes', 'mes_nombre']).size().reset_index(name='cantidad')
+            df_mensual = df_filtrado.groupby(['mes', 'mes_nombre']).size().reset_index(name='cantidad')
             df_mensual = df_mensual.sort_values('mes')
             
             # Crear gráfica de barras
@@ -408,7 +423,7 @@ with tab4:
                 y='cantidad',
                 text='cantidad',
                 labels={'mes_nombre': 'Mes', 'cantidad': 'SIMs Surtidos'},
-                title=f'SIMs Surtidos por Mes - {año_seleccionado}',
+                title=titulo_grafica,
                 color='cantidad',
                 color_continuous_scale='Blues'
             )
@@ -430,24 +445,36 @@ with tab4:
             
             # Métricas del año
             st.markdown("---")
-            st.markdown(f"### 📊 Estadísticas {año_seleccionado}")
+            if distribuidor_seleccionado != "TODOS":
+                st.markdown(f"### 📊 Estadísticas {distribuidor_seleccionado} - {año_seleccionado}")
+            else:
+                st.markdown(f"### 📊 Estadísticas {año_seleccionado}")
             
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                total_año = df_año.shape[0]
-                st.metric("Total SIMs", f"{total_año:,}")
+                total_periodo = df_filtrado.shape[0]
+                st.metric("Total SIMs", f"{total_periodo:,}")
             
             with col2:
-                promedio_mes = total_año / 12 if len(df_mensual) == 12 else total_año / len(df_mensual)
-                st.metric("Promedio/Mes", f"{promedio_mes:,.0f}")
+                if len(df_mensual) > 0:
+                    promedio_mes = total_periodo / len(df_mensual)
+                    st.metric("Promedio/Mes", f"{promedio_mes:,.0f}")
+                else:
+                    st.metric("Promedio/Mes", "0")
             
             with col3:
-                mes_max = df_mensual.loc[df_mensual['cantidad'].idxmax()]
-                st.metric("Mes Máximo", f"{mes_max['mes_nombre']}")
+                if len(df_mensual) > 0:
+                    mes_max = df_mensual.loc[df_mensual['cantidad'].idxmax()]
+                    st.metric("Mes Máximo", f"{mes_max['mes_nombre']}")
+                else:
+                    st.metric("Mes Máximo", "N/A")
             
             with col4:
-                st.metric("Cantidad Máxima", f"{mes_max['cantidad']:,}")
+                if len(df_mensual) > 0:
+                    st.metric("Cantidad Máxima", f"{mes_max['cantidad']:,}")
+                else:
+                    st.metric("Cantidad Máxima", "0")
             
             # Tabla de datos
             st.markdown("---")
