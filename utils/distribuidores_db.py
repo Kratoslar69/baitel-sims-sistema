@@ -156,7 +156,7 @@ def actualizar_distribuidor(id: str, **campos) -> Dict:
     if 'email' in campos:
         data['email'] = campos['email'].lower().strip() if campos['email'] else None
     
-    data['updated_at'] = datetime.now().isoformat()
+    data['fecha_modificacion'] = datetime.now().isoformat()
     
     result = supabase.table('distribuidores')\
         .update(data)\
