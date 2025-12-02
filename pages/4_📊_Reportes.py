@@ -366,7 +366,6 @@ with tab4:
     
     if vista == "📊 Análisis por Año/Mes":
         st.markdown("---")
-        st.markdown("### 📊 Distribución Mensual de SIMs Surtidos")
         
         # Obtener todos los datos
         with st.spinner("Cargando datos..."):
@@ -386,31 +385,45 @@ with tab4:
             años_disponibles = sorted(df_all['año'].unique(), reverse=True)
             distribuidores_disponibles = sorted(df_all['codigo_bt'].unique())
             
-            # Selectores
-            col1, col2, col3 = st.columns([1, 2, 1])
+            # Selectores mejorados
+            st.markdown("""
+            <div style='background-color: #e3f2fd; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;'>
+                <p style='margin: 0; color: #1976d2;'>
+                    <strong>📈 Visualiza el surtido mensual de SIMs</strong><br>
+                    <small>Selecciona un año para ver el surtido general, o filtra por distribuidor específico</small>
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            
             with col1:
                 año_seleccionado = st.selectbox(
-                    "Seleccionar año",
+                    "📅 Año",
                     años_disponibles,
-                    key="año_selector"
+                    key="año_selector",
+                    help="Selecciona el año a analizar"
                 )
             
             with col2:
                 distribuidor_seleccionado = st.selectbox(
-                    "Seleccionar distribuidor",
-                    ["TODOS"] + distribuidores_disponibles,
-                    key="distribuidor_selector"
+                    "👥 Distribuidor",
+                    ["TODOS LOS DISTRIBUIDORES"] + distribuidores_disponibles,
+                    key="distribuidor_selector",
+                    help="Selecciona TODOS para ver el surtido general, o un distribuidor específico"
                 )
+            
+            st.markdown("---")
             
             # Filtrar por año
             df_filtrado = df_all[df_all['año'] == año_seleccionado].copy()
             
             # Filtrar por distribuidor si no es TODOS
-            if distribuidor_seleccionado != "TODOS":
+            if distribuidor_seleccionado != "TODOS LOS DISTRIBUIDORES":
                 df_filtrado = df_filtrado[df_filtrado['codigo_bt'] == distribuidor_seleccionado].copy()
-                titulo_grafica = f'SIMs Surtidos a {distribuidor_seleccionado} por Mes - {año_seleccionado}'
+                titulo_grafica = f'📈 {distribuidor_seleccionado} - {año_seleccionado}'
             else:
-                titulo_grafica = f'SIMs Surtidos (Todos los Distribuidores) por Mes - {año_seleccionado}'
+                titulo_grafica = f'📈 Surtido General Mensual - {año_seleccionado}'
             
             # Agrupar por mes
             df_mensual = df_filtrado.groupby(['mes', 'mes_nombre']).size().reset_index(name='cantidad')
@@ -445,10 +458,10 @@ with tab4:
             
             # Métricas del año
             st.markdown("---")
-            if distribuidor_seleccionado != "TODOS":
+            if distribuidor_seleccionado != "TODOS LOS DISTRIBUIDORES":
                 st.markdown(f"### 📊 Estadísticas {distribuidor_seleccionado} - {año_seleccionado}")
             else:
-                st.markdown(f"### 📊 Estadísticas {año_seleccionado}")
+                st.markdown(f"### 📊 Estadísticas Generales {año_seleccionado}")
             
             col1, col2, col3, col4 = st.columns(4)
             
