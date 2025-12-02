@@ -118,7 +118,7 @@ def buscar_envios(
         query = query.ilike('iccid', f'%{iccid.strip()}%')
     
     if codigo_bt:
-        query = query.eq('codigo_bt', codigo_bt.upper().strip())
+        query = query.ilike('codigo_bt', f'%{codigo_bt.upper().strip()}%')
     
     if fecha_desde:
         query = query.gte('fecha_envio', fecha_desde.isoformat())
