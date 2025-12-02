@@ -328,7 +328,7 @@ def get_sims_por_distribuidor(codigo_bt: str, estatus: str = 'ACTIVO') -> List[D
         .select('*')\
         .eq('codigo_bt', codigo_bt.upper().strip())\
         .eq('estatus', estatus.upper().strip())\
-        .order('fecha', desc=True)\
+        .order('fecha_envio', desc=True)\
         .execute()
     
     return result.data

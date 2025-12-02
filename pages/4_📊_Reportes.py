@@ -357,126 +357,242 @@ with tab3:
 with tab4:
     st.subheader("Análisis Temporal de Asignaciones")
     
-    # Selector de período
-    col1, col2 = st.columns(2)
+    # Selector de vista
+    vista = st.radio(
+        "Tipo de análisis",
+        ["📊 Análisis por Año/Mes", "📈 Análisis por Período"],
+        horizontal=True
+    )
     
-    with col1:
-        periodo = st.selectbox(
-            "Período de análisis",
-            ["Últimos 7 días", "Últimos 30 días", "Últimos 90 días", "Último año", "Personalizado"]
-        )
-    
-    with col2:
-        if periodo == "Personalizado":
-            fecha_inicio = st.date_input(
-                "Fecha inicio",
-                value=date.today() - timedelta(days=30)
+    if vista == "📊 Análisis por Año/Mes":
+        st.markdown("---")
+        st.markdown("### 📊 Distribución Mensual de SIMs Surtidos")
+        
+        # Obtener todos los datos
+        with st.spinner("Cargando datos..."):
+            supabase = get_supabase_client()
+            todos_envios = supabase.table('envios')\
+                .select('fecha_envio, iccid')\
+                .execute()
+        
+        if todos_envios.data:
+            df_all = pd.DataFrame(todos_envios.data)
+            df_all['fecha_envio'] = pd.to_datetime(df_all['fecha_envio'])
+            df_all['año'] = df_all['fecha_envio'].dt.year
+            df_all['mes'] = df_all['fecha_envio'].dt.month
+            df_all['mes_nombre'] = df_all['fecha_envio'].dt.strftime('%B')
+            
+            # Obtener años disponibles
+            años_disponibles = sorted(df_all['año'].unique(), reverse=True)
+            
+            # Selector de año
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                año_seleccionado = st.selectbox(
+                    "Seleccionar año",
+                    años_disponibles,
+                    key="año_selector"
+                )
+            
+            # Filtrar por año
+            df_año = df_all[df_all['año'] == año_seleccionado].copy()
+            
+            # Agrupar por mes
+            df_mensual = df_año.groupby(['mes', 'mes_nombre']).size().reset_index(name='cantidad')
+            df_mensual = df_mensual.sort_values('mes')
+            
+            # Crear gráfica de barras
+            fig_barras = px.bar(
+                df_mensual,
+                x='mes_nombre',
+                y='cantidad',
+                text='cantidad',
+                labels={'mes_nombre': 'Mes', 'cantidad': 'SIMs Surtidos'},
+                title=f'SIMs Surtidos por Mes - {año_seleccionado}',
+                color='cantidad',
+                color_continuous_scale='Blues'
             )
-            fecha_fin = st.date_input(
-                "Fecha fin",
-                value=date.today()
+            
+            fig_barras.update_layout(
+                height=500,
+                showlegend=False,
+                xaxis_title="Mes",
+                yaxis_title="Cantidad de SIMs",
+                hovermode='x unified'
+            )
+            
+            fig_barras.update_traces(
+                textposition='outside',
+                texttemplate='%{text:,}'
+            )
+            
+            st.plotly_chart(fig_barras, use_container_width=True)
+            
+            # Métricas del año
+            st.markdown("---")
+            st.markdown(f"### 📊 Estadísticas {año_seleccionado}")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                total_año = df_año.shape[0]
+                st.metric("Total SIMs", f"{total_año:,}")
+            
+            with col2:
+                promedio_mes = total_año / 12 if len(df_mensual) == 12 else total_año / len(df_mensual)
+                st.metric("Promedio/Mes", f"{promedio_mes:,.0f}")
+            
+            with col3:
+                mes_max = df_mensual.loc[df_mensual['cantidad'].idxmax()]
+                st.metric("Mes Máximo", f"{mes_max['mes_nombre']}")
+            
+            with col4:
+                st.metric("Cantidad Máxima", f"{mes_max['cantidad']:,}")
+            
+            # Tabla de datos
+            st.markdown("---")
+            st.markdown("### 📋 Detalle Mensual")
+            
+            df_tabla = df_mensual[['mes_nombre', 'cantidad']].copy()
+            df_tabla.columns = ['Mes', 'SIMs Surtidos']
+            df_tabla['SIMs Surtidos'] = df_tabla['SIMs Surtidos'].apply(lambda x: f"{x:,}")
+            
+            st.dataframe(df_tabla, use_container_width=True, hide_index=True)
+            
+            # Exportar
+            csv = df_mensual.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label=f"📥 Descargar Datos {año_seleccionado}",
+                data=csv,
+                file_name=f"sims_mensuales_{año_seleccionado}.csv",
+                mime="text/csv"
             )
         else:
-            dias = {"Últimos 7 días": 7, "Últimos 30 días": 30, "Últimos 90 días": 90, "Último año": 365}[periodo]
-            fecha_inicio = date.today() - timedelta(days=dias)
-            fecha_fin = date.today()
+            st.warning("⚠️ No hay datos disponibles")
     
-    if st.button("📊 Generar Análisis", type="primary"):
-        with st.spinner("Generando análisis..."):
-            supabase = get_supabase_client()
-            
-            # Obtener datos del período
-            envios_periodo = supabase.table('envios')\
-                .select('fecha_envio, codigo_bt, iccid, estatus')\
-                .gte('fecha_envio', fecha_inicio.isoformat())\
-                .lte('fecha_envio', fecha_fin.isoformat())\
-                .execute()
-            
-            if envios_periodo.data:
-                df = pd.DataFrame(envios_periodo.data)
-                df['fecha_envio'] = pd.to_datetime(df['fecha_envio'])
-                
-                # Métricas del período
-                st.markdown("### 📊 Resumen del Período")
-                
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    st.metric("Total Asignaciones", len(df))
-                
-                with col2:
-                    activas = len(df[df['estatus'] == 'ACTIVO'])
-                    st.metric("Activas", activas)
-                
-                with col3:
-                    distribuidores_unicos = df['codigo_bt'].nunique()
-                    st.metric("Distribuidores", distribuidores_unicos)
-                
-                with col4:
-                    promedio_dia = len(df) / max((fecha_fin - fecha_inicio).days, 1)
-                    st.metric("Promedio/Día", f"{promedio_dia:.1f}")
-                
-                st.markdown("---")
-                
-                # Gráfica de tendencia
-                st.markdown("### 📈 Tendencia de Asignaciones")
-                
-                df_diario = df.groupby('fecha_envio').size().reset_index(name='cantidad')
-                
-                fig = px.area(
-                    df_diario,
-                    x='fecha_envio',
-                    y='cantidad',
-                    labels={'fecha_envio': 'Fecha', 'cantidad': 'Asignaciones'},
-                    color_discrete_sequence=['#1f77b4']
+    else:
+        # Análisis por período (código original)
+        # Selector de período
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            periodo = st.selectbox(
+                "Período de análisis",
+                ["Últimos 7 días", "Últimos 30 días", "Últimos 90 días", "Último año", "Personalizado"]
+            )
+        
+        with col2:
+            if periodo == "Personalizado":
+                fecha_inicio = st.date_input(
+                    "Fecha inicio",
+                    value=date.today() - timedelta(days=30)
                 )
-                
-                fig.update_layout(height=400, hovermode='x unified')
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown("---")
-                
-                # Top distribuidores del período
-                st.markdown("### 🏆 Top Distribuidores del Período")
-                
-                top_periodo = df.groupby('codigo_bt').size()\
-                    .reset_index(name='asignaciones')\
-                    .sort_values('asignaciones', ascending=False)\
-                    .head(15)
-                
-                fig_top = px.bar(
-                    top_periodo,
-                    x='asignaciones',
-                    y='codigo_bt',
-                    orientation='h',
-                    text='asignaciones',
-                    color='asignaciones',
-                    color_continuous_scale='Viridis'
-                )
-                
-                fig_top.update_layout(
-                    height=500,
-                    showlegend=False,
-                    xaxis_title="Asignaciones",
-                    yaxis_title="",
-                    yaxis={'categoryorder': 'total ascending'}
-                )
-                
-                fig_top.update_traces(textposition='outside')
-                st.plotly_chart(fig_top, use_container_width=True)
-                
-                # Exportar análisis
-                st.markdown("---")
-                csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Descargar Datos Completos",
-                    data=csv,
-                    file_name=f"analisis_{fecha_inicio}_{fecha_fin}.csv",
-                    mime="text/csv",
-                    use_container_width=True
+                fecha_fin = st.date_input(
+                    "Fecha fin",
+                    value=date.today()
                 )
             else:
-                st.warning("⚠️ No hay datos en el período seleccionado")
+                dias = {"Últimos 7 días": 7, "Últimos 30 días": 30, "Últimos 90 días": 90, "Último año": 365}[periodo]
+                fecha_inicio = date.today() - timedelta(days=dias)
+                fecha_fin = date.today()
+        
+        if st.button("📊 Generar Análisis", type="primary"):
+        if st.button("📊 Generar Análisis", type="primary"):
+            with st.spinner("Generando análisis..."):
+                supabase = get_supabase_client()
+                
+                # Obtener datos del período
+                envios_periodo = supabase.table('envios')\
+                    .select('fecha_envio, codigo_bt, iccid, estatus')\
+                    .gte('fecha_envio', fecha_inicio.isoformat())\
+                    .lte('fecha_envio', fecha_fin.isoformat())\
+                    .execute()
+                
+                if envios_periodo.data:
+                    df = pd.DataFrame(envios_periodo.data)
+                    df['fecha_envio'] = pd.to_datetime(df['fecha_envio'])
+                    
+                    # Métricas del período
+                    st.markdown("### 📊 Resumen del Período")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("Total Asignaciones", len(df))
+                    
+                    with col2:
+                        activas = len(df[df['estatus'] == 'ACTIVO'])
+                        st.metric("Activas", activas)
+                    
+                    with col3:
+                        distribuidores_unicos = df['codigo_bt'].nunique()
+                        st.metric("Distribuidores", distribuidores_unicos)
+                    
+                    with col4:
+                        promedio_dia = len(df) / max((fecha_fin - fecha_inicio).days, 1)
+                        st.metric("Promedio/Día", f"{promedio_dia:.1f}")
+                    
+                    st.markdown("---")
+                    
+                    # Gráfica de tendencia
+                    st.markdown("### 📈 Tendencia de Asignaciones")
+                    
+                    df_diario = df.groupby('fecha_envio').size().reset_index(name='cantidad')
+                    
+                    fig = px.area(
+                        df_diario,
+                        x='fecha_envio',
+                        y='cantidad',
+                        labels={'fecha_envio': 'Fecha', 'cantidad': 'Asignaciones'},
+                        color_discrete_sequence=['#1f77b4']
+                    )
+                    
+                    fig.update_layout(height=400, hovermode='x unified')
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    st.markdown("---")
+                    
+                    # Top distribuidores del período
+                    st.markdown("### 🏆 Top Distribuidores del Período")
+                    
+                    top_periodo = df.groupby('codigo_bt').size()\
+                        .reset_index(name='asignaciones')\
+                        .sort_values('asignaciones', ascending=False)\
+                        .head(15)
+                    
+                    fig_top = px.bar(
+                        top_periodo,
+                        x='asignaciones',
+                        y='codigo_bt',
+                        orientation='h',
+                        text='asignaciones',
+                        color='asignaciones',
+                        color_continuous_scale='Viridis'
+                    )
+                    
+                    fig_top.update_layout(
+                        height=500,
+                        showlegend=False,
+                        xaxis_title="Asignaciones",
+                        yaxis_title="",
+                        yaxis={'categoryorder': 'total ascending'}
+                    )
+                    
+                    fig_top.update_traces(textposition='outside')
+                    st.plotly_chart(fig_top, use_container_width=True)
+                    
+                    # Exportar análisis
+                    st.markdown("---")
+                    csv = df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Descargar Datos Completos",
+                        data=csv,
+                        file_name=f"analisis_{fecha_inicio}_{fecha_fin}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("⚠️ No hay datos en el período seleccionado")
 
 # Footer
 st.markdown("---")
