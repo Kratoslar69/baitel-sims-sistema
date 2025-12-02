@@ -376,10 +376,6 @@ with tab4:
             offset = 0
             limit = 1000
             
-            # Crear barra de progreso y texto de estado
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
             while True:
                 response = supabase.table('envios')\
                     .select('fecha_envio, iccid, codigo_bt, nombre_distribuidor')\
@@ -394,32 +390,21 @@ with tab4:
                 all_records.extend(response.data)
                 offset += limit
                 
-                # Actualizar progreso (estimación basada en 95,357 registros)
-                progress = min(offset / 95357, 1.0)
-                progress_bar.progress(progress)
-                status_text.text(f'Cargando datos... {len(all_records):,} registros')
-                
                 # Si obtenemos menos registros que el límite, es la última página
                 if len(response.data) < limit:
                     break
             
-            # Limpiar indicadores de progreso
-            progress_bar.empty()
-            status_text.empty()
-            
-            # Devolver estructura similar a la respuesta de Supabase
-            class ResponseWrapper:
-                def __init__(self, data):
-                    self.data = data
-            
-            return ResponseWrapper(all_records)
+            return all_records
         
         # Obtener todos los datos con caché
         with st.spinner("Cargando datos..."):
-            todos_envios = cargar_todos_envios()
+            datos_envios = cargar_todos_envios()
         
-        if todos_envios.data:
-            df_all = pd.DataFrame(todos_envios.data)
+        # Mostrar mensaje de confirmación
+        st.success(f"✅ Datos cargados: {len(datos_envios):,} registros")
+        
+        if datos_envios:
+            df_all = pd.DataFrame(datos_envios)
             df_all['fecha_envio'] = pd.to_datetime(df_all['fecha_envio'])
             df_all['año'] = df_all['fecha_envio'].dt.year
             df_all['mes'] = df_all['fecha_envio'].dt.month
