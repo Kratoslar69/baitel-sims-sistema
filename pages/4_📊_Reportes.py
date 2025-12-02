@@ -563,13 +563,32 @@ with tab4:
             
             st.dataframe(df_tabla, use_container_width=True, hide_index=True)
             
-            # Exportar
-            csv = df_mensual.to_csv(index=False).encode('utf-8')
+            # Exportar relación completa de ICCIDs
+            st.markdown("---")
+            st.markdown("📄 **Exportar Datos**")
+            
+            # Preparar datos para exportación con información detallada
+            df_exportar = df_filtrado[['iccid', 'codigo_bt', 'nombre_distribuidor', 'fecha_envio']].copy()
+            df_exportar['fecha_envio'] = df_exportar['fecha_envio'].dt.strftime('%Y-%m-%d')
+            df_exportar.columns = ['ICCID', 'Código BT', 'Nombre Distribuidor', 'Fecha de Envío']
+            
+            # Crear CSV
+            csv = df_exportar.to_csv(index=False).encode('utf-8-sig')  # utf-8-sig para Excel
+            
+            # Nombre de archivo dinámico
+            if distribuidor_seleccionado != "TODOS LOS DISTRIBUIDORES":
+                nombre_archivo = f"iccids_{distribuidor_seleccionado.replace(' ', '_')}_{año_seleccionado}.csv"
+                label_boton = f"📅 Descargar ICCIDs de {distribuidor_seleccionado} ({total_periodo:,} registros)"
+            else:
+                nombre_archivo = f"iccids_todos_{año_seleccionado}.csv"
+                label_boton = f"📅 Descargar Todos los ICCIDs de {año_seleccionado} ({total_periodo:,} registros)"
+            
             st.download_button(
-                label=f"📥 Descargar Datos {año_seleccionado}",
+                label=label_boton,
                 data=csv,
-                file_name=f"sims_mensuales_{año_seleccionado}.csv",
-                mime="text/csv"
+                file_name=nombre_archivo,
+                mime="text/csv",
+                help="Descarga la relación completa de ICCIDs con detalles de distribuidor y fecha"
             )
         else:
             st.warning("⚠️ No hay datos disponibles")
