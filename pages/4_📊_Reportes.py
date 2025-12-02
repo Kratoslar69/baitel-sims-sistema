@@ -370,8 +370,10 @@ with tab4:
         # Obtener todos los datos
         with st.spinner("Cargando datos..."):
             supabase = get_supabase_client()
+            # Obtener TODOS los registros (sin límite de 1000)
             todos_envios = supabase.table('envios')\
                 .select('fecha_envio, iccid, codigo_bt, nombre_distribuidor')\
+                .limit(100000)\
                 .execute()
         
         if todos_envios.data:
