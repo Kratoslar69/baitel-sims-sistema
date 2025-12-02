@@ -51,6 +51,10 @@ tab1, tab2, tab3 = st.tabs(["➕ Nuevo Distribuidor", "✏️ Editar Distribuido
 with tab1:
     st.subheader("Registrar Nuevo Distribuidor")
     
+    # Inicializar contador de formularios para forzar limpieza
+    if 'form_counter' not in st.session_state:
+        st.session_state.form_counter = 0
+    
     col1, col2 = st.columns([2, 1])
     
     with col1:
@@ -72,8 +76,8 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
     
-    # Formulario de nuevo distribuidor
-    with st.form("form_nuevo_distribuidor"):
+    # Formulario de nuevo distribuidor (con key dinámica para forzar limpieza)
+    with st.form(f"form_nuevo_distribuidor_{st.session_state.form_counter}"):
         col1, col2 = st.columns(2)
         
         with col1:
@@ -158,6 +162,8 @@ with tab1:
     
     # Botón para registrar otro distribuidor (fuera del formulario)
     if st.button("➕ Registrar Otro Distribuidor", type="primary", use_container_width=True, key="btn_registrar_otro"):
+        # Incrementar contador para crear nuevo formulario limpio
+        st.session_state.form_counter += 1
         st.rerun()
 
 # TAB 2: EDITAR DISTRIBUIDOR
