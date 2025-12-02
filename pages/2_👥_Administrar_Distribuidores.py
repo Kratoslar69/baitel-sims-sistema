@@ -155,6 +155,10 @@ with tab1:
                         
                     except Exception as e:
                         st.error(f"❌ Error al guardar: {str(e)}")
+    
+    # Botón para registrar otro distribuidor (fuera del formulario)
+    if st.button("➕ Registrar Otro Distribuidor", type="primary", use_container_width=True, key="btn_registrar_otro"):
+        st.rerun()
 
 # TAB 2: EDITAR DISTRIBUIDOR
 with tab2:
