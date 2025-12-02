@@ -69,6 +69,25 @@ with st.sidebar:
     st.markdown(f"**Usuario:** Almacén BAITEL")
     st.markdown(f"**Fecha:** {datetime.now().strftime('%d/%m/%Y')}")
 
+# ⚡ ACCIONES RÁPIDAS (MOVIDO AL INICIO)
+st.subheader("⚡ Acciones Rápidas")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("📥 Capturar SIMs", use_container_width=True, type="primary"):
+        st.switch_page("pages/1_📥_Captura_SIMs.py")
+
+with col2:
+    if st.button("👥 Nuevo Distribuidor", use_container_width=True):
+        st.switch_page("pages/2_👥_Administrar_Distribuidores.py")
+
+with col3:
+    if st.button("📊 Ver Reportes", use_container_width=True):
+        st.switch_page("pages/4_📊_Reportes.py")
+
+st.markdown("---")
+
 # Función para obtener datos del dashboard
 @st.cache_data(ttl=60)
 def get_dashboard_data():
@@ -243,25 +262,6 @@ if data:
         st.plotly_chart(fig_top, use_container_width=True)
     else:
         st.info("Sin datos de envíos aún")
-    
-    st.markdown("---")
-    
-    # Acciones rápidas
-    st.subheader("⚡ Acciones Rápidas")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("📥 Capturar SIMs", use_container_width=True):
-            st.switch_page("pages/1_📥_Captura_SIMs.py")
-    
-    with col2:
-        if st.button("👥 Nuevo Distribuidor", use_container_width=True):
-            st.switch_page("pages/2_👥_Administrar_Distribuidores.py")
-    
-    with col3:
-        if st.button("📊 Ver Reportes", use_container_width=True):
-            st.switch_page("pages/4_📊_Reportes.py")
 
 else:
     st.error("Error al cargar los datos del dashboard")
