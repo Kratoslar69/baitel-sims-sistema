@@ -437,7 +437,7 @@ with tab4:
             </div>
             """, unsafe_allow_html=True)
             
-            col1, col2 = st.columns([1, 2])
+            col1, col2 = st.columns([1, 3])
             
             with col1:
                 año_seleccionado = st.selectbox(
@@ -448,9 +448,31 @@ with tab4:
                 )
             
             with col2:
+                # Campo de búsqueda para filtrar distribuidores
+                busqueda_dist = st.text_input(
+                    "🔍 Buscar distribuidor",
+                    placeholder="Escribe para filtrar (ej: BT120, TLALIXCOYAN, XALAPA...)",
+                    key="busqueda_distribuidor",
+                    help="Filtra la lista de distribuidores escribiendo parte del código o nombre"
+                )
+                
+                # Filtrar distribuidores según búsqueda
+                if busqueda_dist:
+                    distribuidores_filtrados = [
+                        d for d in distribuidores_disponibles 
+                        if busqueda_dist.upper() in d.upper()
+                    ]
+                    if distribuidores_filtrados:
+                        opciones_distribuidor = ["TODOS LOS DISTRIBUIDORES"] + distribuidores_filtrados
+                    else:
+                        opciones_distribuidor = ["TODOS LOS DISTRIBUIDORES"]
+                        st.warning(f"⚠️ No se encontraron distribuidores con '{busqueda_dist}'")
+                else:
+                    opciones_distribuidor = ["TODOS LOS DISTRIBUIDORES"] + distribuidores_disponibles
+                
                 distribuidor_seleccionado = st.selectbox(
                     "👥 Distribuidor",
-                    ["TODOS LOS DISTRIBUIDORES"] + distribuidores_disponibles,
+                    opciones_distribuidor,
                     key="distribuidor_selector",
                     help="Selecciona TODOS para ver el surtido general, o un distribuidor específico"
                 )
