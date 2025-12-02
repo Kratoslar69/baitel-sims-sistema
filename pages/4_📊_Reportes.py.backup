@@ -367,56 +367,14 @@ with tab4:
     if vista == "📊 Análisis por Año/Mes":
         st.markdown("---")
         
-        # Función con caché para cargar todos los datos con paginación
-        @st.cache_data(ttl=3600)  # Cache por 1 hora
-        def cargar_todos_envios():
-            """Carga TODOS los registros de envíos usando paginación"""
-            supabase = get_supabase_client()
-            all_records = []
-            offset = 0
-            limit = 1000
-            
-            # Crear barra de progreso y texto de estado
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            while True:
-                response = supabase.table('envios')\
-                    .select('fecha_envio, iccid, codigo_bt, nombre_distribuidor')\
-                    .order('fecha_envio', desc=True)\
-                    .limit(limit)\
-                    .offset(offset)\
-                    .execute()
-                
-                if not response.data:
-                    break
-                
-                all_records.extend(response.data)
-                offset += limit
-                
-                # Actualizar progreso (estimación basada en 95,357 registros)
-                progress = min(offset / 95357, 1.0)
-                progress_bar.progress(progress)
-                status_text.text(f'Cargando datos... {len(all_records):,} registros')
-                
-                # Si obtenemos menos registros que el límite, es la última página
-                if len(response.data) < limit:
-                    break
-            
-            # Limpiar indicadores de progreso
-            progress_bar.empty()
-            status_text.empty()
-            
-            # Devolver estructura similar a la respuesta de Supabase
-            class ResponseWrapper:
-                def __init__(self, data):
-                    self.data = data
-            
-            return ResponseWrapper(all_records)
-        
-        # Obtener todos los datos con caché
+        # Obtener todos los datos
         with st.spinner("Cargando datos..."):
-            todos_envios = cargar_todos_envios()
+            supabase = get_supabase_client()
+            # Obtener TODOS los registros (sin límite de 1000)
+            todos_envios = supabase.table('envios')\
+                .select('fecha_envio, iccid, codigo_bt, nombre_distribuidor')\
+                .limit(100000)\
+                .execute()
         
         if todos_envios.data:
             df_all = pd.DataFrame(todos_envios.data)
@@ -424,19 +382,6 @@ with tab4:
             df_all['año'] = df_all['fecha_envio'].dt.year
             df_all['mes'] = df_all['fecha_envio'].dt.month
             df_all['mes_nombre'] = df_all['fecha_envio'].dt.strftime('%B')
-            
-            # Información de datos cargados
-            col1, col2, col3 = st.columns([2, 2, 1])
-            with col1:
-                st.success(f"✅ Datos cargados: **{len(df_all):,} registros** de {len(df_all['codigo_bt'].unique())} distribuidores")
-            with col2:
-                st.info(f"📅 Período: {df_all['fecha_envio'].min().strftime('%Y-%m-%d')} a {df_all['fecha_envio'].max().strftime('%Y-%m-%d')}")
-            with col3:
-                if st.button("🔄 Recargar", help="Forzar recarga de datos desde la base de datos"):
-                    st.cache_data.clear()
-                    st.rerun()
-            
-            st.markdown("---")
             
             # Obtener años y distribuidores disponibles
             años_disponibles = sorted(df_all['año'].unique(), reverse=True)
