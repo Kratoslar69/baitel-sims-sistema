@@ -143,6 +143,8 @@ def actualizar_distribuidor(id: str, **campos) -> Dict:
     
     # Normalizar datos
     data = {}
+    if 'codigo_bt' in campos:
+        data['codigo_bt'] = campos['codigo_bt'].upper().strip()
     if 'nombre' in campos:
         data['nombre'] = campos['nombre'].upper().strip()
     if 'plaza' in campos:

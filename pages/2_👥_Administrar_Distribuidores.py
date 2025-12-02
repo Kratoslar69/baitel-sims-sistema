@@ -204,7 +204,11 @@ with tab2:
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.text_input("Código BT", value=dist_actual['codigo_bt'], disabled=True, help="El código BT no se puede modificar")
+                    nuevo_codigo_bt = st.text_input(
+                        "Código BT",
+                        value=dist_actual['codigo_bt'],
+                        help="Código BT del distribuidor (editable)"
+                    )
                     
                     nuevo_nombre = st.text_input(
                         "Nombre",
@@ -245,6 +249,7 @@ with tab2:
                         with st.spinner("Actualizando distribuidor..."):
                             actualizado = actualizar_distribuidor(
                                 id=dist_actual['id'],
+                                codigo_bt=nuevo_codigo_bt,
                                 nombre=nuevo_nombre,
                                 plaza=nueva_plaza,
                                 telefono=nuevo_telefono if nuevo_telefono else None,
