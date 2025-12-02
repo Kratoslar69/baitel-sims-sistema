@@ -497,7 +497,6 @@ with tab4:
                 fecha_fin = date.today()
         
         if st.button("📊 Generar Análisis", type="primary"):
-        if st.button("📊 Generar Análisis", type="primary"):
             with st.spinner("Generando análisis..."):
                 supabase = get_supabase_client()
                 
