@@ -242,8 +242,8 @@ with tab2:
             
             # Mostrar tabla
             df = pd.DataFrame(resultados)
-            df_display = df[['fecha_envio', 'iccid', 'codigo_bt', 'nombre_distribuidor', 'estatus', 'observaciones']].copy()
-            df_display.columns = ['Fecha', 'ICCID', 'Código BT', 'Distribuidor', 'Estatus', 'Observaciones']
+            df_display = df[['fecha_envio', 'iccid', 'codigo_bt', 'nombre_distribuidor', 'estatus']].copy()
+            df_display.columns = ['Fecha', 'ICCID', 'Código BT', 'Distribuidor', 'Estatus']
             
             st.dataframe(df_display, use_container_width=True, hide_index=True)
             
@@ -335,8 +335,8 @@ with tab3:
             # Mostrar tabla de SIMs
             if sims_activas:
                 df_sims_display = pd.DataFrame(sims_activas)
-                df_sims_display = df_sims_display[['fecha_envio', 'iccid', 'observaciones']].copy()
-                df_sims_display.columns = ['Fecha', 'ICCID', 'Observaciones']
+                df_sims_display = df_sims_display[['fecha_envio', 'iccid']].copy()
+                df_sims_display.columns = ['Fecha', 'ICCID']
                 
                 st.dataframe(df_sims_display, use_container_width=True, hide_index=True)
                 
