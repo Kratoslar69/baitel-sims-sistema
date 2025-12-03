@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import date
 from utils.distribuidores_db import buscar_distribuidores, get_distribuidor_by_id
 from utils.envios_db import capturar_envio_masivo
+from utils.timezone_config import get_fecha_actual_mexico
 
 # Configuración de la página
 st.set_page_config(
@@ -145,8 +146,8 @@ if st.session_state.distribuidor_seleccionado:
     with col2:
         fecha_envio = st.date_input(
             "Fecha del envío",
-            value=date.today(),
-            help="Fecha en que se realizó el envío"
+            value=get_fecha_actual_mexico(),
+            help="Fecha en que se realizó el envío (Zona horaria: México)"
         )
     
     # Campo de texto para ICCIDs

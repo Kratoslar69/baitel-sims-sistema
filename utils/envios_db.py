@@ -5,6 +5,7 @@ Funciones CRUD para la tabla envios
 from typing import List, Dict, Optional
 from datetime import datetime, date
 from .supabase_client import get_supabase_client
+from .timezone_config import get_fecha_actual_mexico
 
 
 def capturar_envio_masivo(
@@ -34,7 +35,7 @@ def capturar_envio_masivo(
     supabase = get_supabase_client()
     
     if fecha is None:
-        fecha = date.today()
+        fecha = get_fecha_actual_mexico()
     
     # Normalizar ICCIDs
     iccids_limpios = [iccid.strip().upper() for iccid in iccids if iccid.strip()]
@@ -252,7 +253,7 @@ def reasignar_sim(
     
     # Crear nuevo envío ACTIVO
     nuevo_envio = {
-        'fecha_envio': date.today().isoformat(),
+        'fecha_envio': get_fecha_actual_mexico().isoformat(),
         'iccid': iccid.strip().upper(),
         'distribuidor_id': nuevo_distribuidor_id,
         'codigo_bt': nuevo_codigo_bt.upper().strip(),

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, date
 from utils.envios_db import buscar_envios, get_estadisticas_envios, get_sims_por_distribuidor
 from utils.distribuidores_db import buscar_distribuidores, get_todos_distribuidores
 from utils.supabase_client import get_supabase_client
+from utils.timezone_config import get_fecha_actual_mexico
 
 # Configuración de la página
 st.set_page_config(
@@ -56,7 +57,7 @@ with tab1:
         dist_activos = supabase.table('distribuidores').select('*', count='exact').eq('estatus', 'ACTIVO').execute()
         
         # Actividad últimos 30 días
-        hace_30_dias = (datetime.now() - timedelta(days=30)).date().isoformat()
+        hace_30_dias = (get_fecha_actual_mexico() - timedelta(days=30)).isoformat()
         envios_30d = supabase.table('envios')\
             .select('*', count='exact')\
             .gte('fecha_envio', hace_30_dias)\
@@ -206,15 +207,15 @@ with tab2:
     with col1:
         fecha_desde = st.date_input(
             "Fecha desde",
-            value=date.today() - timedelta(days=30),
-            help="Fecha inicial del rango"
+            value=get_fecha_actual_mexico() - timedelta(days=30),
+            help="Fecha inicial del rango (Zona horaria: México)"
         )
     
     with col2:
         fecha_hasta = st.date_input(
             "Fecha hasta",
-            value=date.today(),
-            help="Fecha final del rango"
+            value=get_fecha_actual_mexico(),
+            help="Fecha final del rango (Zona horaria: México)"
         )
     
     with col3:
@@ -608,16 +609,16 @@ with tab4:
             if periodo == "Personalizado":
                 fecha_inicio = st.date_input(
                     "Fecha inicio",
-                    value=date.today() - timedelta(days=30)
+                    value=get_fecha_actual_mexico() - timedelta(days=30)
                 )
                 fecha_fin = st.date_input(
                     "Fecha fin",
-                    value=date.today()
+                    value=get_fecha_actual_mexico()
                 )
             else:
                 dias = {"Últimos 7 días": 7, "Últimos 30 días": 30, "Últimos 90 días": 90, "Último año": 365}[periodo]
-                fecha_inicio = date.today() - timedelta(days=dias)
-                fecha_fin = date.today()
+                fecha_inicio = get_fecha_actual_mexico() - timedelta(days=dias)
+                fecha_fin = get_fecha_actual_mexico()
         
         if st.button("📊 Generar Análisis", type="primary"):
             with st.spinner("Generando análisis..."):
