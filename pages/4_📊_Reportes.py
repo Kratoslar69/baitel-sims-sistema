@@ -222,8 +222,8 @@ with tab2:
         limite_resultados = st.number_input(
             "Límite de resultados",
             min_value=10,
-            max_value=1000,
-            value=100,
+            max_value=5000,
+            value=1000,
             step=10
         )
     
@@ -245,6 +245,9 @@ with tab2:
             df = pd.DataFrame(resultados)
             df_display = df[['fecha_envio', 'iccid', 'codigo_bt', 'nombre_distribuidor', 'estatus']].copy()
             df_display.columns = ['Fecha', 'ICCID', 'Código BT', 'Distribuidor', 'Estatus']
+            
+            # Formatear fecha a DD/MM/YYYY
+            df_display['Fecha'] = pd.to_datetime(df_display['Fecha']).dt.strftime('%d/%m/%Y')
             
             st.dataframe(df_display, use_container_width=True, hide_index=True)
             
