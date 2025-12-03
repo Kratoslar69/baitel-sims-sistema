@@ -58,7 +58,7 @@ def capturar_envio_masivo(
     registros = []
     for iccid in iccids_nuevos:
         registros.append({
-            'fecha': fecha.isoformat(),
+            'fecha_envio': fecha.isoformat(),
             'iccid': iccid,
             'distribuidor_id': distribuidor_id,
             'codigo_bt': codigo_bt.upper().strip(),
@@ -252,7 +252,7 @@ def reasignar_sim(
     
     # Crear nuevo envío ACTIVO
     nuevo_envio = {
-        'fecha': date.today().isoformat(),
+        'fecha_envio': date.today().isoformat(),
         'iccid': iccid.strip().upper(),
         'distribuidor_id': nuevo_distribuidor_id,
         'codigo_bt': nuevo_codigo_bt.upper().strip(),
