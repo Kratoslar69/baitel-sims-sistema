@@ -8,7 +8,8 @@ from utils.envios_db import (
     get_envio_by_iccid,
     corregir_distribuidor_envio,
     reasignar_sim,
-    buscar_envios
+    buscar_envios,
+    eliminar_iccids
 )
 from utils.distribuidores_db import buscar_distribuidores, get_distribuidor_by_id
 
@@ -43,6 +44,13 @@ st.markdown("""
         border-radius: 5px;
         margin: 1rem 0;
     }
+    .danger-box {
+        padding: 1rem;
+        background-color: #f8d7da;
+        border-left: 5px solid #dc3545;
+        border-radius: 5px;
+        margin: 1rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -50,8 +58,8 @@ st.markdown("""
 st.title("🔄 Correcciones y Reasignaciones")
 st.markdown("---")
 
-# Tabs para los dos escenarios
-tab1, tab2 = st.tabs(["✏️ Corrección Simple", "🔄 Reasignación con Historial"])
+# Tabs para los tres escenarios
+tab1, tab2, tab3 = st.tabs(["✏️ Corrección Simple", "🔄 Reasignación con Historial", "🗑️ Eliminar ICCIDs"])
 
 # TAB 1: CORRECCIÓN SIMPLE
 with tab1:
@@ -488,3 +496,167 @@ with tab2:
                         st.warning("⚠️ No se encontraron distribuidores")
             else:
                 st.warning("⚠️ No hay ICCIDs ACTIVOS para reasignar")
+
+# TAB 3: ELIMINAR ICCIDs
+with tab3:
+    st.subheader("🗑️ Eliminar ICCIDs Permanentemente")
+    
+    st.markdown("""
+    <div class="danger-box">
+        <strong>⚠️ ADVERTENCIA:</strong> Esta acción es <strong>IRREVERSIBLE</strong><br>
+        <strong>📋 Escenario:</strong> ICCIDs capturados por error que deben ser eliminados<br>
+        <strong>🎯 Acción:</strong> Eliminar físicamente de la base de datos (sin posibilidad de recuperación)<br>
+        <strong>⚡ Uso:</strong> Con precaución - Solo para errores graves de captura
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Paso 1: Buscar ICCIDs a eliminar
+    st.markdown("### 🔍 Paso 1: Buscar ICCIDs a Eliminar")
+    
+    st.warning("⚠️ **Precaución:** Verifica cuidadosamente los ICCIDs antes de eliminar")
+    
+    iccids_eliminar_text = st.text_area(
+        "ICCIDs a eliminar (uno por línea o separados por comas)",
+        placeholder="8952140063703946403\n8952140063703946404\n8952140063703946405",
+        help="Pega los ICCIDs que deseas eliminar permanentemente",
+        height=150,
+        key="iccids_eliminar"
+    )
+    
+    if iccids_eliminar_text:
+        # Procesar ICCIDs
+        import re
+        iccids_list = re.split(r'[,\s\n]+', iccids_eliminar_text.strip())
+        iccids_list = [iccid.strip() for iccid in iccids_list if iccid.strip()]
+        
+        st.info(f"📊 Total de ICCIDs a procesar: **{len(iccids_list)}**")
+        
+        if st.button("🔍 Buscar ICCIDs", type="secondary", key="buscar_eliminar"):
+            with st.spinner("Buscando ICCIDs..."):
+                resultados = []
+                for iccid in iccids_list:
+                    envio = get_envio_by_iccid(iccid)
+                    if envio:
+                        resultados.append({
+                            'iccid': iccid,
+                            'encontrado': True,
+                            'codigo_bt': envio['codigo_bt'],
+                            'nombre_distribuidor': envio['nombre_distribuidor'],
+                            'estatus': envio['estatus'],
+                            'fecha_envio': envio.get('fecha_envio', 'N/A')
+                        })
+                    else:
+                        resultados.append({
+                            'iccid': iccid,
+                            'encontrado': False,
+                            'codigo_bt': 'N/A',
+                            'nombre_distribuidor': 'N/A',
+                            'estatus': 'NO ENCONTRADO',
+                            'fecha_envio': 'N/A'
+                        })
+                
+                st.session_state['iccids_eliminacion'] = resultados
+        
+        # Mostrar resultados
+        if 'iccids_eliminacion' in st.session_state:
+            resultados = st.session_state['iccids_eliminacion']
+            df_resultados = pd.DataFrame(resultados)
+            
+            # Estadísticas
+            encontrados = df_resultados['encontrado'].sum()
+            no_encontrados = len(df_resultados) - encontrados
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("✅ Encontrados", encontrados)
+            with col2:
+                st.metric("❌ No Encontrados", no_encontrados)
+            
+            # Mostrar tabla
+            st.markdown("### 📋 ICCIDs Encontrados")
+            df_display = df_resultados[['iccid', 'codigo_bt', 'nombre_distribuidor', 'estatus', 'fecha_envio']].copy()
+            df_display.columns = ['ICCID', 'Código BT', 'Distribuidor', 'Estatus', 'Fecha Envío']
+            
+            def highlight_status(row):
+                if row['Estatus'] == 'NO ENCONTRADO':
+                    return ['background-color: #f8d7da'] * len(row)
+                else:
+                    return ['background-color: #fff3cd'] * len(row)
+            
+            st.dataframe(
+                df_display.style.apply(highlight_status, axis=1),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            if encontrados > 0:
+                st.markdown("---")
+                st.markdown("### ⚠️ Confirmar Eliminación")
+                
+                st.markdown(f"""
+                <div class="danger-box">
+                    <h4>⚠️ ADVERTENCIA: ACCIÓN IRREVERSIBLE</h4>
+                    <p><strong>Se eliminarán {encontrados} ICCIDs de forma PERMANENTE</strong><br>
+                    <strong>Esta acción NO se puede deshacer</strong><br>
+                    <strong>Los registros serán borrados completamente de la base de datos</strong></p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Checkbox de confirmación
+                confirmar = st.checkbox(
+                    "✅ Confirmo que he verificado los ICCIDs y deseo eliminarlos permanentemente",
+                    key="confirmar_eliminacion"
+                )
+                
+                motivo_eliminacion = st.text_input(
+                    "Motivo de la eliminación (obligatorio)",
+                    placeholder="Ej: ICCIDs capturados por error, duplicados incorrectos",
+                    key="motivo_eliminacion"
+                )
+                
+                if confirmar and motivo_eliminacion:
+                    if st.button("🗑️ ELIMINAR PERMANENTEMENTE", type="primary", use_container_width=True, key="ejecutar_eliminacion"):
+                        try:
+                            with st.spinner("Eliminando ICCIDs..."):
+                                # Obtener solo ICCIDs encontrados
+                                iccids_encontrados = [r['iccid'] for r in resultados if r['encontrado']]
+                                
+                                # Ejecutar eliminación
+                                resultado = eliminar_iccids(
+                                    iccids=iccids_encontrados,
+                                    usuario="Almacén BAITEL"
+                                )
+                                
+                                # Mostrar resultados
+                                if resultado['eliminados'] > 0:
+                                    st.success(f"✅ Se eliminaron {resultado['eliminados']} ICCIDs correctamente")
+                                    st.balloons()
+                                    
+                                    st.markdown(f"""
+                                    <div class="success-box">
+                                        <h4>✅ Eliminación Completada</h4>
+                                        <p><strong>ICCIDs Eliminados:</strong> {resultado['eliminados']}<br>
+                                        <strong>No Encontrados:</strong> {len(resultado['no_encontrados'])}<br>
+                                        <strong>Errores:</strong> {len(resultado['errores'])}<br>
+                                        <strong>Motivo:</strong> {motivo_eliminacion}</p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                
+                                if resultado['errores']:
+                                    st.error("❌ Errores encontrados:")
+                                    for error in resultado['errores']:
+                                        st.text(f"• {error}")
+                                
+                                # Limpiar session_state
+                                del st.session_state['iccids_eliminacion']
+                                
+                        except Exception as e:
+                            st.error(f"❌ Error al eliminar ICCIDs: {str(e)}")
+                elif not confirmar:
+                    st.warning("⚠️ Debes confirmar que deseas eliminar los ICCIDs")
+                elif not motivo_eliminacion:
+                    st.warning("⚠️ Debes indicar el motivo de la eliminación")
+            else:
+                st.info("ℹ️ No hay ICCIDs encontrados para eliminar")

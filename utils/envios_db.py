@@ -271,6 +271,56 @@ def reasignar_sim(
     }
 
 
+def eliminar_iccids(iccids: List[str], usuario: str = "Sistema") -> Dict:
+    """
+    Eliminar físicamente ICCIDs de la base de datos
+    
+    Args:
+        iccids: Lista de ICCIDs a eliminar
+        usuario: Usuario que realiza la eliminación
+    
+    Returns:
+        Dict con resultado (eliminados, no_encontrados, errores)
+    """
+    supabase = get_supabase_client()
+    
+    # Normalizar ICCIDs
+    iccids_limpios = [iccid.strip().upper() for iccid in iccids if iccid.strip()]
+    
+    eliminados = 0
+    no_encontrados = []
+    errores = []
+    
+    for iccid in iccids_limpios:
+        try:
+            # Verificar si existe
+            envio = get_envio_by_iccid(iccid)
+            
+            if envio:
+                # Eliminar el registro
+                result = supabase.table('envios')\
+                    .delete()\
+                    .eq('iccid', iccid)\
+                    .execute()
+                
+                if result.data:
+                    eliminados += 1
+                else:
+                    errores.append(f"No se pudo eliminar {iccid}")
+            else:
+                no_encontrados.append(iccid)
+                
+        except Exception as e:
+            errores.append(f"Error al eliminar {iccid}: {str(e)}")
+    
+    return {
+        'eliminados': eliminados,
+        'no_encontrados': no_encontrados,
+        'errores': errores,
+        'total_procesados': len(iccids_limpios)
+    }
+
+
 def get_estadisticas_envios() -> Dict:
     """
     Obtener estadísticas de envíos
