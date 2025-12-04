@@ -9,8 +9,11 @@ from utils.envios_db import (
     corregir_distribuidor_envio,
     reasignar_sim,
     buscar_envios,
-    eliminar_iccids
+    eliminar_iccids,
+    corregir_fecha_envio
 )
+from utils.timezone_config import get_fecha_actual_mexico
+from datetime import date, timedelta
 from utils.distribuidores_db import buscar_distribuidores, get_distribuidor_by_id
 
 # Configuración de la página
@@ -58,8 +61,8 @@ st.markdown("""
 st.title("🔄 Correcciones y Reasignaciones")
 st.markdown("---")
 
-# Tabs para los tres escenarios
-tab1, tab2, tab3 = st.tabs(["✏️ Corrección Simple", "🔄 Reasignación con Historial", "🗑️ Eliminar ICCIDs"])
+# Tabs para los cuatro escenarios
+tab1, tab2, tab3, tab4 = st.tabs(["✏️ Corrección Simple", "🔄 Reasignación con Historial", "🗑️ Eliminar ICCIDs", "📅 Corregir Fecha"])
 
 # TAB 1: CORRECCIÓN SIMPLE
 with tab1:
@@ -660,3 +663,187 @@ with tab3:
                     st.warning("⚠️ Debes indicar el motivo de la eliminación")
             else:
                 st.info("ℹ️ No hay ICCIDs encontrados para eliminar")
+
+
+# TAB 4: CORREGIR FECHA DE ENVÍO
+with tab4:
+    st.subheader("📅 Corregir Fecha de Envío")
+    
+    st.markdown("""
+    <div class="info-box">
+        <strong>📋 Escenario:</strong> ICCIDs capturados tardíamente que corresponden a un envío anterior<br>
+        <strong>🎯 Acción:</strong> Actualizar la fecha de envío a la fecha correcta del envío real<br>
+        <strong>⚡ Uso:</strong> Cuando se olvida capturar ICCIDs y se hace días después
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Paso 1: Buscar ICCIDs a corregir fecha
+    st.markdown("### 🔍 Paso 1: Buscar ICCIDs a Corregir Fecha")
+    
+    st.info("💡 **Captura Masiva:** Puedes pegar múltiples ICCIDs separados por saltos de línea, comas o espacios")
+    
+    iccids_fecha_text = st.text_area(
+        "ICCIDs con fecha incorrecta (uno por línea o separados por comas)",
+        placeholder="8952140063718995916F\n8952140063718995734F\n8952140063718995742F",
+        help="Pega todos los ICCIDs que necesitan corrección de fecha",
+        height=150,
+        key="iccids_fecha"
+    )
+    
+    if iccids_fecha_text:
+        # Procesar ICCIDs
+        import re
+        iccids_list = re.split(r'[,\s\n]+', iccids_fecha_text.strip())
+        iccids_list = [iccid.strip() for iccid in iccids_list if iccid.strip()]
+        
+        st.info(f"📊 Total de ICCIDs a procesar: **{len(iccids_list)}**")
+        
+        if st.button("🔍 Buscar ICCIDs", type="secondary", key="buscar_fecha"):
+            with st.spinner("Buscando ICCIDs..."):
+                resultados = []
+                for iccid in iccids_list:
+                    envio = get_envio_by_iccid(iccid)
+                    if envio:
+                        resultados.append({
+                            'iccid': iccid,
+                            'encontrado': True,
+                            'codigo_bt': envio['codigo_bt'],
+                            'nombre_distribuidor': envio['nombre_distribuidor'],
+                            'estatus': envio['estatus'],
+                            'fecha_actual': envio.get('fecha_envio', 'N/A')
+                        })
+                    else:
+                        resultados.append({
+                            'iccid': iccid,
+                            'encontrado': False,
+                            'codigo_bt': 'N/A',
+                            'nombre_distribuidor': 'N/A',
+                            'estatus': 'NO ENCONTRADO',
+                            'fecha_actual': 'N/A'
+                        })
+                
+                st.session_state['iccids_fecha_correccion'] = resultados
+        
+        # Mostrar resultados
+        if 'iccids_fecha_correccion' in st.session_state:
+            resultados = st.session_state['iccids_fecha_correccion']
+            df_resultados = pd.DataFrame(resultados)
+            
+            # Estadísticas
+            encontrados = df_resultados['encontrado'].sum()
+            no_encontrados = len(df_resultados) - encontrados
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("✅ Encontrados", encontrados)
+            with col2:
+                st.metric("❌ No Encontrados", no_encontrados)
+            
+            # Mostrar tabla
+            st.markdown("### 📋 ICCIDs Encontrados")
+            df_display = df_resultados[['iccid', 'codigo_bt', 'nombre_distribuidor', 'fecha_actual', 'estatus']].copy()
+            df_display.columns = ['ICCID', 'Código BT', 'Distribuidor', 'Fecha Actual', 'Estatus']
+            
+            def highlight_status(row):
+                if row['Estatus'] == 'NO ENCONTRADO':
+                    return ['background-color: #f8d7da'] * len(row)
+                else:
+                    return ['background-color: #d1ecf1'] * len(row)
+            
+            st.dataframe(
+                df_display.style.apply(highlight_status, axis=1),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            if encontrados > 0:
+                st.markdown("---")
+                st.markdown("### 📅 Paso 2: Seleccionar Nueva Fecha de Envío")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Fecha correcta del envío
+                    nueva_fecha = st.date_input(
+                        "Fecha correcta del envío",
+                        value=get_fecha_actual_mexico() - timedelta(days=7),
+                        max_value=get_fecha_actual_mexico(),
+                        help="Selecciona la fecha real en que se realizó el envío",
+                        key="nueva_fecha_envio"
+                    )
+                
+                with col2:
+                    # Motivo de la corrección
+                    motivo_fecha = st.text_input(
+                        "Motivo de la corrección",
+                        placeholder="Ej: Captura tardía, envío del 11/11/2025",
+                        key="motivo_fecha"
+                    )
+                
+                st.markdown("---")
+                st.markdown("### ✅ Confirmar Corrección de Fecha")
+                
+                st.markdown(f"""
+                <div class="warning-box">
+                    <strong>📅 Nueva Fecha de Envío:</strong> {nueva_fecha.strftime('%d/%m/%Y')}<br>
+                    <strong>📊 Se actualizarán {encontrados} ICCIDs</strong><br>
+                    <strong>📝 Se agregará nota en observaciones</strong>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if motivo_fecha:
+                    if st.button("💾 Aplicar Corrección de Fecha", type="primary", use_container_width=True, key="aplicar_fecha"):
+                        try:
+                            with st.spinner("Actualizando fechas..."):
+                                # Obtener solo ICCIDs encontrados
+                                iccids_encontrados = [r['iccid'] for r in resultados if r['encontrado']]
+                                
+                                # Ejecutar corrección
+                                resultado = corregir_fecha_envio(
+                                    iccids=iccids_encontrados,
+                                    nueva_fecha=nueva_fecha,
+                                    motivo=motivo_fecha,
+                                    usuario="Almacén BAITEL"
+                                )
+                                
+                                # Mostrar resultados
+                                if resultado['actualizados'] > 0:
+                                    st.success(f"✅ Se actualizaron {resultado['actualizados']} ICCIDs correctamente")
+                                    st.balloons()
+                                    
+                                    st.markdown(f"""
+                                    <div class="success-box">
+                                        <h4>✅ Corrección de Fecha Completada</h4>
+                                        <p><strong>ICCIDs Actualizados:</strong> {resultado['actualizados']}<br>
+                                        <strong>Nueva Fecha:</strong> {nueva_fecha.strftime('%d/%m/%Y')}<br>
+                                        <strong>Motivo:</strong> {motivo_fecha}<br>
+                                        <strong>No Encontrados:</strong> {len(resultado['no_encontrados'])}<br>
+                                        <strong>Errores:</strong> {len(resultado['errores'])}</p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Mostrar detalles
+                                    if resultado['detalles']:
+                                        st.markdown("### 📋 Detalles de Actualización")
+                                        df_detalles = pd.DataFrame(resultado['detalles'])
+                                        df_detalles.columns = ['ICCID', 'Fecha Anterior', 'Fecha Nueva', 'Distribuidor']
+                                        st.dataframe(df_detalles, use_container_width=True, hide_index=True)
+                                    
+                                    # Limpiar session state
+                                    del st.session_state['iccids_fecha_correccion']
+                                    
+                                else:
+                                    st.warning("⚠️ No se pudo actualizar ningún ICCID")
+                                
+                                # Mostrar errores si los hay
+                                if resultado['errores']:
+                                    st.error("❌ Errores encontrados:")
+                                    for error in resultado['errores']:
+                                        st.write(f"- {error}")
+                                
+                        except Exception as e:
+                            st.error(f"❌ Error al corregir fechas: {str(e)}")
+                else:
+                    st.warning("⚠️ Por favor indica el motivo de la corrección")

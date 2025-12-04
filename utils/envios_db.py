@@ -411,3 +411,69 @@ def cancelar_envio(iccid: str, motivo: str, usuario: str = "Sistema") -> Dict:
         .execute()
     
     return result.data[0] if result.data else None
+
+
+def corregir_fecha_envio(iccids: List[str], nueva_fecha: date, motivo: str, usuario: str = "Sistema") -> Dict:
+    """
+    Corregir la fecha de envío de ICCIDs capturados tardíamente
+    
+    Args:
+        iccids: Lista de ICCIDs a corregir
+        nueva_fecha: Nueva fecha de envío correcta
+        motivo: Motivo de la corrección
+        usuario: Usuario que realiza la corrección
+    
+    Returns:
+        Dict con resultado (actualizados, no_encontrados, errores)
+    """
+    supabase = get_supabase_client()
+    
+    # Normalizar ICCIDs
+    iccids_limpios = [iccid.strip().upper() for iccid in iccids if iccid.strip()]
+    
+    actualizados = 0
+    no_encontrados = []
+    errores = []
+    detalles = []
+    
+    for iccid in iccids_limpios:
+        try:
+            # Verificar si existe
+            envio = get_envio_by_iccid(iccid)
+            
+            if envio:
+                fecha_anterior = envio['fecha_envio']
+                
+                # Actualizar fecha
+                result = supabase.table('envios')\
+                    .update({
+                        'fecha_envio': nueva_fecha.isoformat(),
+                        'observaciones': f"{envio.get('observaciones', '')} | FECHA CORREGIDA: {motivo}".strip(' |'),
+                        'updated_at': datetime.now().isoformat()
+                    })\
+                    .eq('iccid', iccid)\
+                    .execute()
+                
+                if result.data:
+                    actualizados += 1
+                    detalles.append({
+                        'iccid': iccid,
+                        'fecha_anterior': fecha_anterior,
+                        'fecha_nueva': nueva_fecha.isoformat(),
+                        'distribuidor': envio['codigo_bt']
+                    })
+                else:
+                    errores.append(f"No se pudo actualizar {iccid}")
+            else:
+                no_encontrados.append(iccid)
+                
+        except Exception as e:
+            errores.append(f"Error al actualizar {iccid}: {str(e)}")
+    
+    return {
+        'actualizados': actualizados,
+        'no_encontrados': no_encontrados,
+        'errores': errores,
+        'detalles': detalles,
+        'total_procesados': len(iccids_limpios)
+    }
