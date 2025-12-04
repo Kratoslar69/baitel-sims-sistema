@@ -448,8 +448,7 @@ def corregir_fecha_envio(iccids: List[str], nueva_fecha: date, motivo: str, usua
                 result = supabase.table('envios')\
                     .update({
                         'fecha_envio': nueva_fecha.isoformat(),
-                        'observaciones': f"{envio.get('observaciones', '')} | FECHA CORREGIDA: {motivo}".strip(' |'),
-                        'updated_at': datetime.now().isoformat()
+                        'observaciones': f"{envio.get('observaciones', '')} | FECHA CORREGIDA: {motivo}".strip(' |')
                     })\
                     .eq('iccid', iccid)\
                     .execute()
