@@ -202,7 +202,7 @@ with tab2:
             ["TODOS", "ACTIVO", "REASIGNADO", "CANCELADO"]
         )
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
         fecha_desde = st.date_input(
@@ -218,24 +218,18 @@ with tab2:
             help="Fecha final del rango (Zona horaria: México)"
         )
     
-    with col3:
-        limite_resultados = st.number_input(
-            "Límite de resultados",
-            min_value=10,
-            max_value=5000,
-            value=1000,
-            step=10
-        )
+    # Sin límite - obtener todos los registros que coincidan con los filtros
+    st.info("ℹ️ El sistema traerá TODOS los registros que coincidan con los filtros, sin límites")
     
     if st.button("🔍 Buscar Envíos", type="primary"):
-        with st.spinner("Buscando..."):
+        with st.spinner("Buscando todos los registros que coincidan con los filtros..."):
             resultados = buscar_envios(
                 iccid=iccid_buscar if iccid_buscar else None,
                 codigo_bt=codigo_bt_buscar if codigo_bt_buscar else None,
                 fecha_desde=fecha_desde,
                 fecha_hasta=fecha_hasta,
                 estatus=estatus_buscar if estatus_buscar != "TODOS" else None,
-                limit=limite_resultados
+                limit=None  # Sin límite - obtener todos los registros
             )
         
         if resultados:
