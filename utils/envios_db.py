@@ -106,34 +106,81 @@ def buscar_envios(
         fecha_desde: Fecha inicial
         fecha_hasta: Fecha final
         estatus: Filtrar por estatus
-        limit: Límite de resultados
+        limit: Límite de resultados (None = sin límite, obtiene todos)
     
     Returns:
         Lista de envíos encontrados
     """
     supabase = get_supabase_client()
     
-    query = supabase.table('envios').select('*')
-    
-    if iccid:
-        query = query.ilike('iccid', f'%{iccid.strip()}%')
-    
-    if codigo_bt:
-        query = query.ilike('codigo_bt', f'%{codigo_bt.upper().strip()}%')
-    
-    if fecha_desde:
-        query = query.gte('fecha_envio', fecha_desde.isoformat())
-    
-    if fecha_hasta:
-        query = query.lte('fecha_envio', fecha_hasta.isoformat())
-    
-    if estatus:
-        query = query.eq('estatus', estatus.upper().strip())
-    
-    query = query.order('created_at', desc=True).limit(limit)
-    
-    result = query.execute()
-    return result.data
+    # Si el límite es muy alto o None, usar paginación para obtener todos los resultados
+    if limit is None or limit > 1000:
+        all_results = []
+        offset = 0
+        batch_size = 1000  # Límite de Supabase por consulta
+        
+        while True:
+            query = supabase.table('envios').select('*')
+            
+            if iccid:
+                query = query.ilike('iccid', f'%{iccid.strip()}%')
+            
+            if codigo_bt:
+                query = query.ilike('codigo_bt', f'%{codigo_bt.upper().strip()}%')
+            
+            if fecha_desde:
+                query = query.gte('fecha_envio', fecha_desde.isoformat())
+            
+            if fecha_hasta:
+                query = query.lte('fecha_envio', fecha_hasta.isoformat())
+            
+            if estatus:
+                query = query.eq('estatus', estatus.upper().strip())
+            
+            query = query.order('created_at', desc=True).range(offset, offset + batch_size - 1)
+            
+            result = query.execute()
+            
+            if not result.data:
+                break
+            
+            all_results.extend(result.data)
+            
+            # Si obtuvimos menos de batch_size, ya no hay más resultados
+            if len(result.data) < batch_size:
+                break
+            
+            offset += batch_size
+            
+            # Si tenemos un límite específico y ya lo alcanzamos, detener
+            if limit is not None and len(all_results) >= limit:
+                all_results = all_results[:limit]
+                break
+        
+        return all_results
+    else:
+        # Para límites pequeños, usar la consulta simple
+        query = supabase.table('envios').select('*')
+        
+        if iccid:
+            query = query.ilike('iccid', f'%{iccid.strip()}%')
+        
+        if codigo_bt:
+            query = query.ilike('codigo_bt', f'%{codigo_bt.upper().strip()}%')
+        
+        if fecha_desde:
+            query = query.gte('fecha_envio', fecha_desde.isoformat())
+        
+        if fecha_hasta:
+            query = query.lte('fecha_envio', fecha_hasta.isoformat())
+        
+        if estatus:
+            query = query.eq('estatus', estatus.upper().strip())
+        
+        query = query.order('created_at', desc=True).limit(limit)
+        
+        result = query.execute()
+        return result.data
 
 
 def get_envio_by_iccid(iccid: str) -> Optional[Dict]:
